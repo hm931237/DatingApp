@@ -1,3 +1,7 @@
+using System.Threading.Tasks;
+using DatingApp.API.Models;
+using Microsoft.EntityFrameworkCore;
+
 namespace DatingApp.API.Data
 {
     public class AuthRepository : IAuthRepository
@@ -17,13 +21,23 @@ namespace DatingApp.API.Data
             await _context.SaveChangesAsync();
             return user;
         }
-        public Task<User> Login (string username, string Password)
+        public async Task<User> Login (string username, string Password)
         {
-            throw new system.NotImplementedException();
+            var User=await _context.Users.FirstOrDefaultAsync(x => x.UserName == username);
+            if(User == null)
+                return null;
+
+            if(!VerifyPasswordHAsh(Password,User.PasswordHash,User.PasswordSalt))
+                return null;
+
+            return User;
         }
-        public Task<bool> UserExists (string username)
+        public async Task<bool> UserExists (string username)
         {
-            throw new system.NotImplementedException();
+            if(await _context.Users.AnyAsync(x => x.UserName == username))
+                return true;
+
+            return false;
         }
          
         private void CreatePasswordHash(string Password,out byte[] PasswordHash,out byte[] PasswordSalt)
@@ -34,6 +48,19 @@ namespace DatingApp.API.Data
                   PasswordHash=hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(Password));
             }
         }
-
+        private bool VerifyPasswordHAsh(string Password, byte[] PasswordHash, byte[] PasswordSalt)
+        {
+            using (var hmac =new System.Security.Cryptography.HMACSHA512(PasswordSalt))
+            {
+                  var ComputeHash =hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(Password));
+                  for (int i = 0; i < ComputeHash.Length; i++)
+                  {
+                      if(PasswordHash[i] != ComputeHash[i]){
+                        return false;
+                      }
+                  }
+            }
+            return true;
+        }
     }
 }
